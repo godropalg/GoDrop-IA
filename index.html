@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileDrop Real - Trasferisci File da Telefono a PC</title>
+    <meta name="description" content="Trasferisci file dal telefono al PC in tempo reale. Scansiona QR code, carica dal cellulare, scarica sul PC.">
+    <meta name="keywords" content="trasferisci file, telefono a pc, qr code, file sharing, wireless transfer">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; color: white; padding: 30px 0; }
+        .header h1 { font-size: 2.8rem; margin-bottom: 10px; }
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        @media (max-width: 768px) {
+            .main-content { grid-template-columns: 1fr; }
+        }
+        .card {
+            background: white; border-radius: 20px; padding: 30px; 
+            text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .qr-container {
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .qr-container img {
+            max-width: 250px;
+            border: 10px solid white;
+            border-radius: 10px;
+        }
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; padding: 15px 40px;
+            font-size: 1.2rem; border-radius: 50px; cursor: pointer;
+            margin: 20px 0; font-weight: bold;
+            transition: transform 0.3s;
+        }
+        .upload-btn:hover { transform: scale(1.05); }
+        .file-list { 
+            background: white; border-radius: 15px; padding: 30px; 
+            margin: 30px 0; min-height: 300px;
+        }
+        .file-item {
+            padding: 15px; 
+            border-bottom: 1px solid #eee; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        .file-item:hover { background: #f9f9f9; }
+        .footer { text-align: center; color: white; padding: 40px 0; margin-top: 50px; }
+        .status-indicator {
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status-waiting { background: #fff3cd; color: #856404; }
+        .status-active { background: #d4edda; color: #155724; }
+        .code-display {
+            font-size: 2.5rem;
+            letter-spacing: 5px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 2rem; }
+            .card { padding: 20px 15px; }
+            .code-display { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header container">
+        <h1>📲 FileDrop Real</h1>
+        <p>Trasferisci file dal telefono al PC in tempo reale • 100% Gratuito</p>
+    </div>
+
+    <div class="container">
+        <div class="main-content">
+            <!-- Colonna sinistra: Genera QR Code -->
+            <div class="card">
+                <div style="font-size: 4rem; margin-bottom: 20px;">📱</div>
+                <h2 style="color: #333;">1. Genera QR Code</h2>
+                <p style="color: #666; margin: 15px 0;">
+                    Crea una sessione di trasferimento. Il QR code collegherà il tuo telefono.
+                </p>
+                
+                <div id="qrSection" class="qr-container">
+                    <p>Genera un codice per iniziare</p>
+                </div>
+                
+                <button class="upload-btn" id="generateBtn" onclick="generateSession()">
+                    🔄 GENERA NUOVO CODICE
+                </button>
+                
+                <div id="sessionInfo" style="display: none; margin-top: 20px;">
+                    <p>Codice sessione:</p>
+                    <div id="currentCode" class="code-display"></div>
+                    <p style="color: #666; font-size: 0.9rem;">
+                        Condividi questo codice o scansiona il QR con il telefono
+                    </p>
+                </div>
+            </div>
+
+            <!-- Colonna destra: Upload da PC -->
+            <div class="card">
+                <div style="font-size: 4rem; margin-bottom: 20px;">💻</div>
+                <h2 style="color: #333;">2. Upload da PC</h2>
+                <p style="color: #666; margin: 15px 0;">
+                    Carica file direttamente dal tuo computer
+                </p>
+                
+                <div style="padding: 40px; border: 3px dashed #ddd; border-radius: 15px; margin: 20px 0;">
+                    <div style="font-size: 3rem;">📁</div>
+                    <p>Trascina i file qui o clicca sotto</p>
+                </div>
+                
+                <button class="upload-btn" id="pcUploadBtn" onclick="document.getElementById('pcFileInput').click()">
+                    📂 SCEGLI FILE DAL PC
+                </button>
+                <input type="file" id="pcFileInput" multiple style="display: none;">
+                
+                <div id="pcUploadStatus" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+
+        <!-- File disponibili -->
+        <div class="file-list">
+            <h3 style="color: #333; margin-bottom: 20px;">
+                📁 File Disponibili per Download 
+                <span id="fileCount" style="background: #667eea; color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.9rem;">0</span>
+            </h3>
+            <div id="statusIndicator" class="status-indicator status-waiting">
+                ⏳ In attesa di file... Scansiona il QR code con il telefono
+            </div>
+            <div id="filesContainer"></div>
+        </div>
+    </div>
+
+    <div class="footer container">
+        <h3>🚀 FileDrop Real</h3>
+        <p>Trasferimento file wireless tra dispositivi</p>
+        <p style="margin-top: 30px; font-size: 0.9rem; opacity: 0.8;">
+            © 2024 FileDrop Real • File conservati per 24 ore • Limite 5GB
+        </p>
+    </div>
+
+    <script>
+        let currentCode = null;
+        let pollInterval = null;
+        let checkCount = 0;
+
+        // Genera nuova sessione
+        async function generateSession() {
+            try {
+                document.getElementById('generateBtn').disabled = true;
+                document.getElementById('generateBtn').innerHTML = '🔄 GENERANDO...';
+                
+                const response = await fetch('/api/create');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentCode = data.code;
+                    
+                    // Mostra QR code
+                    document.getElementById('qrSection').innerHTML = `
+                        <p><strong>Scansiona con il telefono:</strong></p>
+                        <img src="${data.qrCodeUrl}" alt="QR Code">
+                        <p style="margin-top: 10px; color: #666;">
+                            Oppure visita: ${window.location.origin}/upload.html?code=${currentCode}
+                        </p>
+                    `;
+                    
+                    // Mostra codice
+                    document.getElementById('sessionInfo').style.display = 'block';
+                    document.getElementById('currentCode').textContent = currentCode;
+                    
+                    // Aggiorna URL con hash
+                    window.location.hash = currentCode;
+                    
+                    // Avvia polling
+                    startPolling();
+                    
+                    document.getElementById('statusIndicator').className = 'status-indicator status-active';
+                    document.getElementById('statusIndicator').innerHTML = '✅ Sessione attiva! Scansiona il QR code con il telefono';
+                }
+            } catch (error) {
+                alert('Errore: ' + error.message);
+            } finally {
+                document.getElementById('generateBtn').disabled = false;
+                document.getElementById('generateBtn').innerHTML = '🔄 GENERA NUOVO CODICE';
+            }
+        }
+
+        // Polling per nuovi file
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            
+            pollInterval = setInterval(async () => {
+                if (!currentCode) return;
+                
+                try {
+                    const response = await fetch(`/api/status/${currentCode}`);
+                    const data = await response.json();
+                    
+                    if (data.exists && data.files.length > 0) {
+                        updateFileList(data.files);
+                        checkCount = 0;
+                    } else {
+                        checkCount++;
+                        if (checkCount === 1) {
+                            document.getElementById('statusIndicator').innerHTML = 
+                                '⏳ In attesa di file... Scansiona il QR code con il telefono';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000); // Controlla ogni 2 secondi
+        }
+
+        // Aggiorna lista file
+        function updateFileList(files) {
+            const container = document.getElementById('filesContainer');
+            document.getElementById('fileCount').textContent = files.length;
+            
+            if (files.length === 0) {
+                container.innerHTML = '<p style="color: #666; text-align: center; padding: 40px;">Nessun file ancora caricato</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            document.getElementById('statusIndicator').innerHTML = 
+                `✅ ${files.length} file disponibili per il download`;
+            
+            files.forEach((file, index) => {
+                const fileEl = document.createElement('div');
+                fileEl.className = 'file-item';
+                fileEl.innerHTML = `
+                    <div style="flex: 1;">
+                        <div style="font-size: 1.2rem; font-weight: bold;">${file.name}</div>
+                        <div style="color: #666; font-size: 0.9rem;">
+                            ${file.size} • Caricato: ${new Date(file.uploaded).toLocaleTimeString()}
+                        </div>
+                    </div>
+                    <div>
+                        <button onclick="downloadFile('${file.url}')" 
+                                style="background: #4CAF50; color: white; border: none; 
+                                       padding: 10px 20px; border-radius: 5px; cursor: pointer;
+                                       display: flex; align-items: center; gap: 8px;">
+                            ⬇️ Download
+                        </button>
+                    </div>
+                `;
+                container.appendChild(fileEl);
+            });
+        }
+
+        // Download file
+        function downloadFile(url) {
+            window.open(url, '_blank');
+        }
+
+        // Upload da PC
+        async function uploadFromPC(files) {
+            if (!currentCode) {
+                const createSession = confirm('Prima di caricare, devi generare una sessione. Generare ora?');
+                if (createSession) {
+                    await generateSession();
+                    if (!currentCode) return;
+                } else {
+                    return;
+                }
+            }
+            
+            const statusDiv = document.getElementById('pcUploadStatus');
+            statusDiv.innerHTML = '<p>📤 Caricamento in corso...</p>';
+            
+            const formData = new FormData();
+            Array.from(files).forEach(file => {
+                formData.append('files', file);
+            });
+            
+            try {
+                const response = await fetch(`/api/upload?code=${currentCode}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    statusDiv.innerHTML = `<p style="color: green;">✅ ${result.message}</p>`;
+                    // Aggiorna lista
+                    const checkResp = await fetch(`/api/status/${currentCode}`);
+                    const data = await checkResp.json();
+                    if (data.exists) updateFileList(data.files);
+                } else {
+                    statusDiv.innerHTML = `<p style="color: red;">❌ ${result.error}</p>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<p style="color: red;">❌ Errore di connessione</p>`;
+            }
+        }
+
+        // Drag & Drop
+        function setupDragDrop() {
+            const dropZone = document.querySelector('.card:nth-child(2)');
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.border = '3px dashed #667eea';
+                dropZone.style.background = '#f8f9ff';
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.border = 'none';
+                dropZone.style.background = 'white';
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.border = 'none';
+                dropZone.style.background = 'white';
+                
+                if (e.dataTransfer.files.length > 0) {
+                    uploadFromPC(e.dataTransfer.files);
+                }
+            });
+        }
+
+        // Inizializzazione
+        document.addEventListener('DOMContentLoaded', () => {
+            // Controlla se c'è un codice nell'URL
+            if (window.location.hash) {
+                currentCode = window.location.hash.substring(1);
+                document.getElementById('currentCode').textContent = currentCode;
+                document.getElementById('sessionInfo').style.display = 'block';
+                startPolling();
+            }
+            
+            // Setup upload da PC
+            document.getElementById('pcFileInput').addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    uploadFromPC(e.target.files);
+                }
+            });
+            
+            setupDragDrop();
+        });
+    </script>
+</body>
+</html>
